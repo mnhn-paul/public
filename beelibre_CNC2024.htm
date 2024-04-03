@@ -23,16 +23,6 @@
     </style>
 </head>
 <body>
-    <div>
-        <label for="projectIdSelect">Select Project ID:</label>
-        <select id="projectIdSelect" onchange="populateTable()">
-            <option value="city-nature-challenge-2024-luxembourg">City Nature Challenge 2024 Luxembourg</option>
-            <option value="city-nature-challenge-2023-luxembourg">City Nature Challenge 2023 Luxembourg</option>
-            <option value="city-nature-challenge-2022-luxembourg" selected>City Nature Challenge 2022 Luxembourg</option>
-        </select>
-        <button onclick="populateTable()">Refresh Data</button>
-    </div>
-
     <table id="observationTable">
         <tr>
             <th>User ID</th>
@@ -70,7 +60,7 @@
 
         // Function to populate table with data
         function populateTable() {
-            const project_id = document.getElementById("projectIdSelect").value;
+            const project_id = "city-nature-challenge-2023-luxembourg";
             const table = document.getElementById("observationTable");
 
             // Get observers for each taxon ID
@@ -100,9 +90,6 @@
 
                 // Determine the maximum number of rows needed
                 const maxRows = Math.max(observersOsmia.length, observersBombus.length, observersSubgenus.length, observersAndrena.length);
-
-                // Clear table
-                table.innerHTML = '';
 
                 // Write each result to the HTML table
                 for (let i = 0; i < maxRows; i++) {
@@ -145,7 +132,7 @@
             });
         }
 
-        // Call populateTable when the page loads
+        // Call the function when the page loads
         window.onload = populateTable;
     </script>
 </body>
