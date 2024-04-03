@@ -108,3 +108,50 @@
                     const row = table.insertRow();
                     
                     // Add data for Osmia
+                    if (i < observersOsmia.length) {
+                        const observerOsmia = observersOsmia[i];
+                        const userLogin = observerOsmia.user.login;
+                        const userObservationsUrl = generateUserObservationsUrl(userLogin, project_id);
+                        row.insertCell().textContent = observerOsmia.user.id;
+                        row.insertCell().textContent = observerOsmia.user.login;
+                        row.insertCell().innerHTML = `<a href="${userObservationsUrl}" target="_blank">Link</a>`;
+                        row.insertCell().textContent = observerOsmia.observation_count;
+                    } else {
+                        row.insertCell().colSpan = 4;
+                    }
+                    
+                    // Add data for Bombus pascuorum
+                    if (i < observersBombus.length) {
+                        row.insertCell().textContent = observersBombus[i].observation_count;
+                    } else {
+                        row.insertCell();
+                    }
+                    
+                    // Add data for Subgenus Bombus
+                    if (i < observersSubgenus.length) {
+                        row.insertCell().textContent = observersSubgenus[i].observation_count;
+                    } else {
+                        row.insertCell();
+                    }
+                    
+                    // Add data for Andrena
+                    if (i < observersAndrena.length) {
+                        row.insertCell().textContent = observersAndrena[i].observation_count;
+                    } else {
+                        row.insertCell();
+                    }
+                }
+            });
+        }
+
+        // Refresh Data Function
+        function refreshData() {
+            const project_id = document.getElementById("projectIdSelect").value;
+            populateTable(project_id);
+        }
+
+        // Call the function when the page loads
+        window.onload = populateTable;
+    </script>
+</body>
+</html>
