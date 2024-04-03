@@ -44,23 +44,6 @@
                 });
         }
 
-        // Function to make API call and return results for insect hotel observation count
-        function getInsectHotelObservers(project_id) {
-            const url = `https://api.inaturalist.org/v2/observations/observers?project_id=${project_id}&fields=user.login&order_by=observation_count&field:On%20Insect%20Hotel%3F=yes`;
-            return fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to retrieve data from the API for insect hotel. Status code: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => [data.results, data.total_results])
-                .catch(error => {
-                    console.error('Error:', error);
-                    return [[], 0];
-                });
-        }
-
         // Function to populate tables
         function populateTables() {
             const project_id = "city-nature-challenge-2023-luxembourg";
@@ -80,8 +63,7 @@
                 getObservers(project_id, 57674),
                 getObservers(project_id, 55637),
                 getObservers(project_id, 538903),
-                getObservers(project_id, 57669),
-                getInsectHotelObservers(project_id) // New call for insect hotel observers
+                getObservers(project_id, 57669)
             ]).then(results => {
                 // Combine observation counts for each user
                 results.forEach(([observers, totalResults, taxonId]) => {
@@ -112,8 +94,6 @@
                     const headerText = `${taxonInfo.name}<br><a href="${taxonInfo.url}" target="_blank">nr. users (${taxonInfo.totalResults})</a>`;
                     headers.push(headerText);
                 });
-                // Add header for Insect Hotel
-                headers.push('Insect Hotel');
                 const headerRow = combinedTable.insertRow();
                 headers.forEach(headerText => {
                     const th = document.createElement('th');
@@ -136,9 +116,6 @@
                         const observationCell = row.insertCell();
                         observationCell.textContent = observationCount === 0 ? '' : observationCount;
                     });
-                    // Add cell for Insect Hotel
-                    const insectHotelCell = row.insertCell();
-                    insectHotelCell.textContent = observer.observation_counts[null] || '';
                 });
             });
         }
