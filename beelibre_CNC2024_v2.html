@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observation Results</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div id="tablesContainer"></div>
+
+    <script>
+        // Function to make API call and return results along with total count
+        function getObservers(project_id, taxon_id) {
+            const url = `https://api.inaturalist.org/v2/observations/observers?project_id=${project_id}&taxon_id=${taxon_id}&fields=user.login&order_by=observation_count`;
+            return fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to retrieve data from the API for taxon ID ${taxon_id}. Status code: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => [data.results, data.total_results, taxon_id])
+                .catch(error => {
+                    console.error('Error:', error);
+                    return [[], 0, taxon_id];
+                });
+        }
+
+        // Function to populate tables
+        function populateTables() {
+            const project_id = "city-nature-challenge-2023-luxembourg";
+            const container = document.getElementById("tablesContainer");
+            const combinedObservers = {}; // Object to store combined observation counts for each user
+
+            // Taxon ID to Name and URL mapping
+            const taxonIdToInfo = {
+                '57674': { name: 'Osmia', url: `https://inaturalist.lu/observations?place_id=any&project_id=${project_id}&taxon_id=57674` },
+                '55637': { name: 'Bombus pascuorum', url: `https://inaturalist.lu/observations?place_id=any&project_id=${project_id}&taxon_id=55637` },
+                '538903': { name: 'Subgenus Bombus', url: `https://inaturalist.lu/observations?place_id=any&project_id=${project_id}&taxon_id=538903` },
+                '57669': { name: 'Andrena', url: `https://inaturalist.lu/observations?place_id=any&project_id=${project_id}&taxon_id=57669` }
+            };
+
+            // Get observers for each taxon ID
+            Promise.all([
+                getObservers(project_id, 57674),
+                getObservers(project_id, 55637),
+                getObservers(project_id, 538903),
+                getObservers(project_id, 57669)
+            ]).then(results => {
+                // Combine observation counts for each user
+                results.forEach(([observers, totalResults, taxonId]) => {
+                    const taxonInfo = taxonIdToInfo[taxonId];
+                    taxonInfo.totalResults = totalResults;
+                    observers.forEach(observer => {
+                        if (!combinedObservers[observer.user.id]) {
+                            combinedObservers[observer.user.id] = {
+                                id: observer.user.id,
+                                login: observer.user.login,
+                                observation_counts: {
+                                    [taxonId]: observer.observation_count
+                                }
+                            };
+                        } else {
+                            combinedObservers[observer.user.id].observation_counts[taxonId] = observer.observation_count;
+                        }
+                    });
+                });
+
+                // Create and populate the combined table
+                const combinedTable = document.createElement('table');
+                container.appendChild(combinedTable);
+
+                // Add table headers
+                const headers = ['User ID', 'User Name'];
+                Object.values(taxonIdToInfo).forEach(taxonInfo => {
+                    const headerText = `${taxonInfo.name}<br><a href="${taxonInfo.url}" target="_blank">nr. users (${taxonInfo.totalResults})</a>`;
+                    headers.push(headerText);
+                });
+                const headerRow = combinedTable.insertRow();
+                headers.forEach(headerText => {
+                    const th = document.createElement('th');
+                    th.innerHTML = headerText;
+                    headerRow.appendChild(th);
+                });
+
+                // Add data rows
+                Object.values(combinedObservers).forEach(observer => {
+                    const row = combinedTable.insertRow();
+                    row.insertCell().textContent = observer.id;
+                    const userNameCell = row.insertCell();
+                    const userNameLink = document.createElement('a');
+                    userNameLink.href = `https://inaturalist.lu/people/${observer.login}`;
+                    userNameLink.textContent = observer.login;
+                    userNameLink.target = "_blank"; // Open link in a new tab
+                    userNameCell.appendChild(userNameLink);
+                    Object.keys(taxonIdToInfo).forEach(taxonId => {
+                        const observationCount = observer.observation_counts[taxonId];
+                        const observationCell = row.insertCell();
+                        observationCell.textContent = observationCount === 0 ? '' : observationCount;
+                    });
+                });
+            });
+        }
+
+        // Call the function when the page loads
+        window.onload = populateTables;
+    </script>
+</body>
+</html>
