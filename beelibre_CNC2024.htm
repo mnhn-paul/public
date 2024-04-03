@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Observation Results</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <table id="observationTable">
+        <tr>
+            <th>User ID</th>
+            <th>User Name</th>
+            <th>User Observations</th>
+            <th>Obs Osmia (<span id="totalOsmia"></span>)</th>
+            <th>Obs Bombus pascuorum (<span id="totalBombus"></span>)</th>
+            <th>Obs Subgenus Bombus (<span id="totalSubgenus"></span>)</th>
+            <th>Obs Andrena (<span id="totalAndrena"></span>)</th>
+        </tr>
+    </table>
+
+    <script>
+        // Function to make API call and return results
+        function getObservers(project_id, taxon_id) {
+            const url = `https://api.inaturalist.org/v2/observations/observers?project_id=${project_id}&taxon_id=${taxon_id}&fields=user.login&order_by=observation_count`;
+            return fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Failed to retrieve data from the API for taxon ID ${taxon_id}. Status code: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => [data.results, taxon_id, data.total_results])
+                .catch(error => {
+                    console.error('Error:', error);
+                    return [[], taxon_id, 0];
+                });
+        }
+
+        // Function to generate the URL for user observations
+        function generateUserObservationsUrl(user_login, project_id) {
+            return `https://inaturalist.lu/observations?project_id=${project_id}&user_id=${user_login}&verifiable=any`;
+        }
+
+        // Function to populate table with data
+        function populateTable() {
+            const project_id = "city-nature-challenge-2023-luxembourg";
+            const table = document.getElementById("observationTable");
+
+            // Get observers for each taxon ID
+            Promise.all([
+                getObservers(project_id, 57674),
+                getObservers(project_id, 55637),
+                getObservers(project_id, 538903),
+                getObservers(project_id, 57669)
+            ]).then(results => {
+                const [observersOsmia, taxonIdOsmia, totalResultsOsmia] = results[0];
+                const [observersBombus, taxonIdBombus, totalResultsBombus] = results[1];
+                const [observersSubgenus, taxonIdSubgenus, totalResultsSubgenus] = results[2];
+                const [observersAndrena, taxonIdAndrena, totalResultsAndrena] = results[3];
+
+                // Display total results
+                document.getElementById("totalOsmia").textContent = totalResultsOsmia;
+                document.getElementById("totalBombus").textContent = totalResultsBombus;
+                document.getElementById("totalSubgenus").textContent = totalResultsSubgenus;
+                document.getElementById("totalAndrena").textContent = totalResultsAndrena;
+
+                // Determine the maximum number of rows needed
+                const maxRows = Math.max(observersOsmia.length, observersBombus.length, observersSubgenus.length, observersAndrena.length);
+
+                // Write each result to the HTML table
+                for (let i = 0; i < maxRows; i++) {
+                    const row = table.insertRow();
+                    
+                    // Add data for Osmia
+                    if (i < observersOsmia.length) {
+                        const observerOsmia = observersOsmia[i];
+                        const userLogin = observerOsmia.user.login;
+                        const userObservationsUrl = generateUserObservationsUrl(userLogin, project_id);
+                        row.insertCell().textContent = observerOsmia.user.id;
+                        row.insertCell().textContent = observerOsmia.user.login;
+                        row.insertCell().innerHTML = `<a href="${userObservationsUrl}" target="_blank">Link</a>`;
+                        row.insertCell().textContent = observerOsmia.observation_count;
+                    } else {
+                        row.insertCell().colSpan = 4;
+                    }
+                    
+                    // Add data for Bombus pascuorum
+                    if (i < observersBombus.length) {
+                        row.insertCell().textContent = observersBombus[i].observation_count;
+                    } else {
+                        row.insertCell();
+                    }
+                    
+                    // Add data for Subgenus Bombus
+                    if (i < observersSubgenus.length) {
+                        row.insertCell().textContent = observersSubgenus[i].observation_count;
+                    } else {
+                        row.insertCell();
+                    }
+                    
+                    // Add data for Andrena
+                    if (i < observersAndrena.length) {
+                        row.insertCell().textContent = observersAndrena[i].observation_count;
+                    } else {
+                        row.insertCell();
+                    }
+                }
+            });
+        }
+
+        // Call the function when the page loads
+        window.onload = populateTable;
+    </script>
+</body>
+</html>
