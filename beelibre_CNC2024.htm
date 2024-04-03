@@ -29,9 +29,9 @@
             <th>User Name</th>
             <th>User Observations</th>
             <th>Obs Osmia (<a id="osmiaLink" href="#" target="_blank"></a>)</th>
-            <th>Obs Bombus pascuorum (<span id="totalBombus"></span>)</th>
-            <th>Obs Subgenus Bombus (<span id="totalSubgenus"></span>)</th>
-            <th>Obs Andrena (<span id="totalAndrena"></span>)</th>
+            <th>Obs Bombus pascuorum (<a id="bombusLink" href="#" target="_blank"></a>)</th>
+            <th>Obs Subgenus Bombus (<a id="subgenusLink" href="#" target="_blank"></a>)</th>
+            <th>Obs Andrena (<a id="andrenaLink" href="#" target="_blank"></a>)</th>
         </tr>
     </table>
 
@@ -71,19 +71,22 @@
                 getObservers(project_id, 57669)
             ]).then(results => {
                 const [observersOsmia, taxonIdOsmia, totalResultsOsmia, osmiaUrl] = results[0];
-                const [observersBombus, taxonIdBombus, totalResultsBombus] = results[1];
-                const [observersSubgenus, taxonIdSubgenus, totalResultsSubgenus] = results[2];
-                const [observersAndrena, taxonIdAndrena, totalResultsAndrena] = results[3];
+                const [observersBombus, taxonIdBombus, totalResultsBombus, bombusUrl] = results[1];
+                const [observersSubgenus, taxonIdSubgenus, totalResultsSubgenus, subgenusUrl] = results[2];
+                const [observersAndrena, taxonIdAndrena, totalResultsAndrena, andrenaUrl] = results[3];
 
-                // Display total results and set hyperlink for Obs Osmia
-                const osmiaLink = document.getElementById("osmiaLink");
-                osmiaLink.textContent = totalResultsOsmia;
-                osmiaLink.href = `https://inaturalist.lu/observations?order_by=observation_count&${osmiaUrl.split('?')[1]}`;
+                // Display total results and set hyperlinks for each Obs
+                document.getElementById("osmiaLink").textContent = totalResultsOsmia;
+                document.getElementById("osmiaLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${osmiaUrl.split('?')[1]}`;
 
-                // Display total results for other taxa
-                document.getElementById("totalBombus").textContent = totalResultsBombus;
-                document.getElementById("totalSubgenus").textContent = totalResultsSubgenus;
-                document.getElementById("totalAndrena").textContent = totalResultsAndrena;
+                document.getElementById("bombusLink").textContent = totalResultsBombus;
+                document.getElementById("bombusLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${bombusUrl.split('?')[1]}`;
+
+                document.getElementById("subgenusLink").textContent = totalResultsSubgenus;
+                document.getElementById("subgenusLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${subgenusUrl.split('?')[1]}`;
+
+                document.getElementById("andrenaLink").textContent = totalResultsAndrena;
+                document.getElementById("andrenaLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${andrenaUrl.split('?')[1]}`;
 
                 // Determine the maximum number of rows needed
                 const maxRows = Math.max(observersOsmia.length, observersBombus.length, observersSubgenus.length, observersAndrena.length);
