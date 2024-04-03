@@ -23,9 +23,18 @@
     </style>
 </head>
 <body>
+    <div>
+        <label for="projectIdSelect">Select Project ID:</label>
+        <select id="projectIdSelect" onchange="populateTable()">
+            <option value="city-nature-challenge-2024-luxembourg">City Nature Challenge 2024 Luxembourg</option>
+            <option value="city-nature-challenge-2023-luxembourg" selected>City Nature Challenge 2023 Luxembourg</option>
+            <option value="city-nature-challenge-2022-luxembourg">City Nature Challenge 2022 Luxembourg</option>
+        </select>
+        <button onclick="populateTable()">Refresh Data</button>
+    </div>
+
     <table id="observationTable">
         <tr>
-            <th>User ID</th>
             <th>User Name</th>
             <th>User Observations</th>
             <th>Obs Osmia (<a id="osmiaLink" href="#" target="_blank"></a>)</th>
@@ -46,21 +55,16 @@
                     }
                     return response.json();
                 })
-                .then(data => [data.results, taxon_id, data.total_results, url])
+                .then(data => [data.results, data.total_results])
                 .catch(error => {
                     console.error('Error:', error);
-                    return [[], taxon_id, 0, url];
+                    return [[], 0];
                 });
-        }
-
-        // Function to generate the URL for user observations
-        function generateUserObservationsUrl(user_login, project_id) {
-            return `https://inaturalist.lu/observations?project_id=${project_id}&user_id=${user_login}&verifiable=any`;
         }
 
         // Function to populate table with data
         function populateTable() {
-            const project_id = "city-nature-challenge-2023-luxembourg";
+            const project_id = document.getElementById("projectIdSelect").value;
             const table = document.getElementById("observationTable");
 
             // Get observers for each taxon ID
@@ -70,26 +74,29 @@
                 getObservers(project_id, 538903),
                 getObservers(project_id, 57669)
             ]).then(results => {
-                const [observersOsmia, taxonIdOsmia, totalResultsOsmia, osmiaUrl] = results[0];
-                const [observersBombus, taxonIdBombus, totalResultsBombus, bombusUrl] = results[1];
-                const [observersSubgenus, taxonIdSubgenus, totalResultsSubgenus, subgenusUrl] = results[2];
-                const [observersAndrena, taxonIdAndrena, totalResultsAndrena, andrenaUrl] = results[3];
+                const [observersOsmia, totalResultsOsmia] = results[0];
+                const [observersBombus, totalResultsBombus] = results[1];
+                const [observersSubgenus, totalResultsSubgenus] = results[2];
+                const [observersAndrena, totalResultsAndrena] = results[3];
 
                 // Display total results and set hyperlinks for each Obs
                 document.getElementById("osmiaLink").textContent = totalResultsOsmia;
-                document.getElementById("osmiaLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${osmiaUrl.split('?')[1]}`;
+                document.getElementById("osmiaLink").href = `https://inaturalist.lu/observations?order_by=observation_count`;
 
                 document.getElementById("bombusLink").textContent = totalResultsBombus;
-                document.getElementById("bombusLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${bombusUrl.split('?')[1]}`;
+                document.getElementById("bombusLink").href = `https://inaturalist.lu/observations?order_by=observation_count`;
 
                 document.getElementById("subgenusLink").textContent = totalResultsSubgenus;
-                document.getElementById("subgenusLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${subgenusUrl.split('?')[1]}`;
+                document.getElementById("subgenusLink").href = `https://inaturalist.lu/observations?order_by=observation_count`;
 
                 document.getElementById("andrenaLink").textContent = totalResultsAndrena;
-                document.getElementById("andrenaLink").href = `https://inaturalist.lu/observations?order_by=observation_count&${andrenaUrl.split('?')[1]}`;
+                document.getElementById("andrenaLink").href = `https://inaturalist.lu/observations?order_by=observation_count`;
 
                 // Determine the maximum number of rows needed
                 const maxRows = Math.max(observersOsmia.length, observersBombus.length, observersSubgenus.length, observersAndrena.length);
+
+                // Clear table
+                table.innerHTML = '';
 
                 // Write each result to the HTML table
                 for (let i = 0; i < maxRows; i++) {
@@ -99,13 +106,11 @@
                     if (i < observersOsmia.length) {
                         const observerOsmia = observersOsmia[i];
                         const userLogin = observerOsmia.user.login;
-                        const userObservationsUrl = generateUserObservationsUrl(userLogin, project_id);
-                        row.insertCell().textContent = observerOsmia.user.id;
-                        row.insertCell().textContent = observerOsmia.user.login;
-                        row.insertCell().innerHTML = `<a href="${userObservationsUrl}" target="_blank">Link</a>`;
+                        const userObservationsUrl = `https://inaturalist.lu/observations?project_id=${project_id}&user_id=${userLogin}&verifiable=any`;
+                        row.insertCell().innerHTML = `<a href="https://inaturalist.lu/people/${userLogin}" target="_blank">${userLogin}</a>`;
                         row.insertCell().textContent = observerOsmia.observation_count;
                     } else {
-                        row.insertCell().colSpan = 4;
+                        row.insertCell();
                     }
                     
                     // Add data for Bombus pascuorum
@@ -132,7 +137,7 @@
             });
         }
 
-        // Call the function when the page loads
+        // Call populateTable when the page loads
         window.onload = populateTable;
     </script>
 </body>
