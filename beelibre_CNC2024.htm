@@ -78,7 +78,7 @@
                 // Display total results and set hyperlink for Obs Osmia
                 const osmiaLink = document.getElementById("osmiaLink");
                 osmiaLink.textContent = totalResultsOsmia;
-                osmiaLink.href = osmiaUrl;
+                osmiaLink.href = `https://inaturalist.lu/observations?order_by=observation_count&${osmiaUrl.split('?')[1]}`;
 
                 // Display total results for other taxa
                 document.getElementById("totalBombus").textContent = totalResultsBombus;
