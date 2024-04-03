@@ -25,12 +25,12 @@
 <body>
     <div>
         <label for="projectIdSelect">Select Project ID:</label>
-        <select id="projectIdSelect">
+        <select id="projectIdSelect" onchange="populateTable()">
             <option value="city-nature-challenge-2024-luxembourg">City Nature Challenge 2024 Luxembourg</option>
             <option value="city-nature-challenge-2023-luxembourg" selected>City Nature Challenge 2023 Luxembourg</option>
             <option value="city-nature-challenge-2022-luxembourg">City Nature Challenge 2022 Luxembourg</option>
         </select>
-        <button onclick="refreshData()">Refresh Data</button>
+        <button onclick="populateTable()">Refresh Data</button>
     </div>
 
     <table id="observationTable">
@@ -69,7 +69,8 @@
         }
 
         // Function to populate table with data
-        function populateTable(project_id) {
+        function populateTable() {
+            const project_id = document.getElementById("projectIdSelect").value;
             const table = document.getElementById("observationTable");
 
             // Get observers for each taxon ID
@@ -144,4 +145,8 @@
             });
         }
 
-        // Refresh
+        // Call populateTable when the page loads
+        window.onload = populateTable;
+    </script>
+</body>
+</html>
