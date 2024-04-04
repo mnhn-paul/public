@@ -71,14 +71,29 @@
                     countMap[entry.taxon.id] = entry.count;
                 });
 
-                // Loop through results and create table rows
-                results.forEach(result => {
+                // Calculate and store ratio values
+                const processedResults = results.map(result => {
+                    const taxonId = result.taxon.id;
+                    const originalCount = result.count;
+                    const newCount = countMap[taxonId];
+                    let ratio = newCount === 0 ? 'N/A' : (originalCount / newCount * 100).toFixed(2);
+                    if (isNaN(ratio)) {
+                        ratio = 0;
+                    }
+                    return { ...result, ratio: parseFloat(ratio) };
+                });
+
+                // Sort the data by ratio (descending order) after setting "NaN" to "0"
+                processedResults.sort((a, b) => b.ratio - a.ratio);
+
+                // Loop through sorted results and create table rows
+                processedResults.forEach(result => {
                     const taxonId = result.taxon.id;
                     const taxonName = result.taxon.name;
                     const iconicTaxonName = result.taxon.iconic_taxon_name;
                     const originalCount = result.count;
                     const newCount = countMap[taxonId];
-                    const ratio = newCount === 0 ? 'N/A' : (originalCount / newCount * 100).toFixed(2) + '%';
+                    const ratio = result.ratio === 'N/A' ? 'N/A' : result.ratio + '%';
                     const countCNC23Url = `https://inaturalist.lu/observations?place_id=120582&project_id=153723&taxon_id=${taxonId}&quality_grade=research`;
                     const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research`;
 
