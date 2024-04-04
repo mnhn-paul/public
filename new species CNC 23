@@ -45,7 +45,7 @@
 <script>
     // Function to fetch data for a given page
     function fetchData(pageNumber) {
-        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=153723&quality_grade=research&page=${pageNumber}&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
+        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=153723&quality_grade=research&page=${pageNumber}&per_page=1000&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
             .then(response => response.json());
     }
 
