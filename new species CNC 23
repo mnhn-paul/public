@@ -29,6 +29,7 @@
 <table id="species-table">
   <thead>
     <tr>
+      <th>Index</th> <!-- Index column added -->
       <th>Taxon ID</th>
       <th>Taxon Name</th>
       <th>Iconic Taxon Name</th>
@@ -45,15 +46,24 @@
 <script>
     // Function to fetch data for a given page
     function fetchData(pageNumber) {
-        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=153723&quality_grade=research&page=${pageNumber}&per_page=1000&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
+        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=153723&quality_grade=research&page=${pageNumber}&per_page=500&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
             .then(response => response.json());
     }
 
     // Function to fetch count data for taxon IDs
     function fetchCountData(taxonIds) {
-        const taxonIdString = taxonIds.join(',');
-        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${taxonIdString}&quality_grade=research&fields=count`)
-            .then(response => response.json());
+        const batchSize = 500;
+        const batches = [];
+        for (let i = 0; i < taxonIds.length; i += batchSize) {
+            const batch = taxonIds.slice(i, i + batchSize);
+            batches.push(batch);
+        }
+        const promises = batches.map(batch => {
+            const taxonIdString = batch.join(',');
+            return fetch(`https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${taxonIdString}&quality_grade=research&fields=taxon.id,count`)
+                .then(response => response.json());
+        });
+        return Promise.all(promises).then(results => results.reduce((acc, val) => acc.concat(val.results), []));
     }
 
     // Function to process data and update table
@@ -62,12 +72,12 @@
         const tbody = document.getElementById('species-data');
         const taxonIds = results.map(result => result.taxon.id);
 
-        // Fetch count data for taxon IDs
+        // Fetch count data for all taxon IDs
         fetchCountData(taxonIds)
             .then(countData => {
                 // Map taxon ID to count
                 const countMap = {};
-                countData.results.forEach(entry => {
+                countData.forEach(entry => {
                     countMap[entry.taxon.id] = entry.count;
                 });
 
@@ -75,24 +85,24 @@
                 const processedResults = results.map(result => {
                     const taxonId = result.taxon.id;
                     const originalCount = result.count;
-                    const newCount = countMap[taxonId];
+                    const newCount = countMap[taxonId] || 0; // If no count data, set it to 0
                     let ratio = newCount === 0 ? 'N/A' : (originalCount / newCount * 100).toFixed(2);
                     if (isNaN(ratio)) {
                         ratio = 0;
                     }
-                    return { ...result, ratio: parseFloat(ratio) };
+                    return { ...result, ratio: parseFloat(ratio), totalCount: newCount };
                 });
 
                 // Sort the data by ratio (descending order) after setting "NaN" to "0"
                 processedResults.sort((a, b) => b.ratio - a.ratio);
 
                 // Loop through sorted results and create table rows
-                processedResults.forEach(result => {
+                processedResults.forEach((result, index) => { // Add index parameter to forEach
                     const taxonId = result.taxon.id;
                     const taxonName = result.taxon.name;
                     const iconicTaxonName = result.taxon.iconic_taxon_name;
                     const originalCount = result.count;
-                    const newCount = countMap[taxonId];
+                    const newCount = result.totalCount;
                     const ratio = result.ratio === 'N/A' ? 'N/A' : result.ratio + '%';
                     const countCNC23Url = `https://inaturalist.lu/observations?place_id=120582&project_id=153723&taxon_id=${taxonId}&quality_grade=research`;
                     const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research`;
@@ -100,6 +110,7 @@
                     // Create a table row and append to tbody
                     const row = document.createElement('tr');
                     row.innerHTML = `
+                        <td>${index + 1}</td> <!-- Add index column -->
                         <td><a href="https://inaturalist.lu/taxa/${taxonId}" target="_blank">${taxonId}</a></td>
                         <td><span class="italic">${taxonName}</span></td>
                         <td>${iconicTaxonName}</td>
@@ -116,14 +127,17 @@
     }
 
     // Function to fetch all data recursively
-    function fetchAllData(pageNumber = 1) {
+    function fetchAllData(pageNumber = 1, allResults = []) {
         fetchData(pageNumber)
             .then(data => {
                 const results = data.results;
-                processData(results);
+                allResults.push(...results);
                 const nextPage = data.page + 1;
                 if (nextPage <= Math.ceil(data.total_results / data.per_page)) {
-                    fetchAllData(nextPage); // Fetch next page recursively
+                    fetchAllData(nextPage, allResults); // Fetch next page recursively
+                } else {
+                    // All data fetched, process it
+                    processData(allResults);
                 }
             })
             .catch(error => {
