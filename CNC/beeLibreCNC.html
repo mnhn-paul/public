@@ -1,0 +1,176 @@
+import requests
+import pandas as pd
+import urllib.parse
+
+# Function to make API call and print URL
+def make_api_call(url, label):
+    print(f"API URL ({label}):", url)
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to fetch data for URL: {url}")
+        return None
+
+# Define the base URL
+base_url = "https://api.inaturalist.org/v2/observations/observers"
+
+# Define the variables
+project_id = "city-nature-challenge-2023-luxembourg"
+calls = {
+    "taxon": {
+        "57674": "Osmia",
+        "55637": "Bombus pascuorum",
+        "538903": "Subgenus Bombus",
+        "57669": "Andrena",
+        "433133,574503,199145,173595,154666,178512,53648,61891,127831,243536": "parasitic",
+        "49995,51559,51668,55783": "mimics"
+    },
+    "observation_field": {
+        "On Insect Hotel?": "hotel",
+        "Pollen on insect": "pollen",
+        "Nectar / Pollen delivering plant": "flower"
+    }
+}
+
+# Initialize an empty list to store the results
+results = []
+
+# Initialize a dictionary to store user appearances
+user_appearances = {}
+
+# Iterate through each call and make API call
+for call_type, call_data in calls.items():
+    for query, name in call_data.items():
+        if call_type == "taxon":
+            # Construct the URL with the current taxon_id
+            url = f"{base_url}?project_id={project_id}&taxon_id={query}&fields=user.login&order_by=observation_count"
+        elif call_type == "observation_field":
+            # Construct the URL with the current observation field query
+            query_param = f"field:{urllib.parse.quote(query)}"
+            url = f"{base_url}?project_id={project_id}&{query_param}&fields=user.login&order_by=observation_count"
+        data = make_api_call(url, name)
+        if data:
+            total_results = data["total_results"]
+            results.append({"query": query, "name": name, "data": data, "total_results": total_results})
+            # Count user appearances
+            for observation in data["results"]:
+                user_login = observation["user"]["login"]
+                if user_login not in user_appearances:
+                    user_appearances[user_login] = 0
+                user_appearances[user_login] += 1
+
+# Create a dictionary to store user observations
+user_observations = {}
+
+# Iterate through the results and organize them into the dictionary
+for result in results:
+    query = result["query"]
+    name = result["name"]
+    total_results = result["total_results"]
+    for observation in result["data"]["results"]:
+        user_login = observation["user"]["login"]
+        observation_count = observation["observation_count"]
+        if user_login not in user_observations:
+            user_observations[user_login] = {}
+        # Convert 0 values to None
+        observation_count = int(observation_count) if observation_count != 0 else None
+        user_observations[user_login][name] = observation_count
+
+# Create a DataFrame from the dictionary
+df = pd.DataFrame.from_dict(user_observations, orient='index')
+
+# Add a new column for user appearances
+df['user_appearances'] = df.index.map(lambda x: user_appearances.get(x, 0))
+
+# Sort DataFrame by user appearances
+df = df.sort_values(by='user_appearances', ascending=False)
+
+# Rearrange the columns
+columns = list(df.columns)
+columns.remove('user_appearances')
+df = df[[*columns, 'user_appearances']]
+
+# Replace NaN values with empty strings
+df = df.fillna("")
+
+# Rename the first column to "users" and make the values hyperlinks
+usernames = df.index.tolist()
+user_hyperlinks = [f'<a href="https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2023-luxembourg&user_id={username}" target="_blank">{username}</a>' for username in usernames]
+df.index = user_hyperlinks
+
+# Create a new DataFrame with modified column labels
+new_columns = []
+for col in df.columns[:-1]:
+    taxon_id = None
+    for key, value in calls["taxon"].items():
+        if value in col:
+            taxon_id = key
+            break
+    if taxon_id:
+        # Fetching the corresponding total_results value
+        total_results = None
+        for result in results:
+            if result["query"] == taxon_id:
+                total_results = result["total_results"]
+                break
+        # Constructing the URL with the total_results value
+        url = f"https://inaturalist.lu/observations?project_id={project_id}&taxon_id={taxon_id}"
+        # Updating column label with the total_results value
+        new_col = f'<a href="{url}" target="_blank">{col} ({total_results})</a>'
+        new_columns.append(new_col)
+    else:
+        new_columns.append(col)
+
+# Update DataFrame with new column labels
+df.columns = new_columns + [df.columns[-1]]
+
+# Generate HTML table with CSS styling
+html_table = df.to_html(classes='styled-table', index=True, na_rep="", justify="center", escape=False)
+
+# Adding a large button below the title
+button_html = '<div style="text-align: center; margin-top: 20px;">' \
+              '<a href="https://inaturalist.lu/observations/identify?iconic_taxa=Insecta&verifiable=true&project_id=city-nature-challenge-2023-luxembourg&place_id=any" target="_blank">' \
+              '<button style="font-size: 24px; padding: 10px 20px;">Help to Identify Insects</button></a>' \
+              '<a href="https://inaturalist.lu/observations/identify?iconic_taxa=Insecta&verifiable=true&without_field=Pollen+on+insect&project_id=city-nature-challenge-2023-luxembourg&place_id=any" target="_blank">' \
+              '<button style="font-size: 24px; padding: 10px 20px; margin-left: 10px;">Tag Insects with Pollen</button></a>' \
+              '<a href="https://inaturalist.lu/observations/identify?iconic_taxa=Insecta&verifiable=true&without_field=Nectar %2F Pollen delivering plant&project_id=city-nature-challenge-2023-luxembourg&place_id=any" target="_blank">' \
+              '<button style="font-size: 24px; padding: 10px 20px; margin-left: 10px;">Tag Insects on Flowers</button></a>' \
+              '<a href="https://inaturalist.lu/observations/identify?iconic_taxa=Insecta&verifiable=true&without_field=On%20Insect%20Hotel%3F&project_id=city-nature-challenge-2023-luxembourg&place_id=any" target="_blank">' \
+              '<button style="font-size: 24px; padding: 10px 20px; margin-left: 10px;">Tag Insects on Insect Hotel</button></a></div>'
+
+# Logo URL and link
+logo_url = "https://static.inaturalist.org/wiki_page_attachments/3773-original.jpg"
+logo_link = "https://inaturalist.lu/projects/city-nature-challenge-2024-luxembourg"
+
+# HTML for the logo
+logo_html = f'<div style="text-align: center;"><a href="{logo_link}" target="_blank">' \
+            f'<img src="{logo_url}" style="width: 20%;" alt="CNC Logo"></a></div>'
+
+# Write HTML content to a file
+with open("observation_data.html", "w") as f:
+    f.write("<html>\n<head>\n<title>BeeLibre CNC observations</title>\n")
+    f.write("<style>")
+    f.write(".styled-table {")
+    f.write("    border-collapse: collapse;")
+    f.write("    width: 100%;")
+    f.write("    border: 1px solid #ddd;")
+    f.write("}")
+    f.write(".styled-table th, .styled-table td {")
+    f.write("    border: 1px solid #ddd;")
+    f.write("    padding: 8px;")
+    f.write("    text-align: left;")
+    f.write("}")
+    f.write(".styled-table th {")
+    f.write("    background-color: #f2f2f2;")
+    f.write("}")
+    f.write("</style>")
+    f.write("</head>\n<body>\n")
+    f.write(logo_html)  # Adding the logo
+    f.write("<div style='text-align: center;'><h1>BeeLibre CNC observations</h1></div>\n")
+    f.write(f"{button_html}\n")  # Adding the buttons
+    f.write(html_table)
+    f.write("\n</body>\n</html>")
+
+# Print success message
+print("HTML file has been generated successfully.")
