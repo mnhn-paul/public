@@ -46,7 +46,7 @@
 <script>
     // Function to fetch data for a given page
     function fetchData(pageNumber) {
-        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=city-nature-challenge-2024-luxembourg&quality_grade=research&page=${pageNumber}&per_page=500&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
+        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=city-nature-challenge-2024-luxembourg&quality_grade=research&user_id=paul_luap&page=${pageNumber}&per_page=500&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
             .then(response => response.json());
     }
 
@@ -60,7 +60,7 @@
         }
         const promises = batches.map(batch => {
             const taxonIdString = batch.join(',');
-            return fetch(`https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${taxonIdString}&quality_grade=research&fields=taxon.id,count`)
+            return fetch(`https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${taxonIdString}&user_id=paul_luap&quality_grade=research&fields=taxon.id,count`)
                 .then(response => response.json());
         });
         return Promise.all(promises).then(results => results.reduce((acc, val) => acc.concat(val.results), []));
@@ -104,8 +104,8 @@
                     const originalCount = result.count;
                     const newCount = result.totalCount;
                     const ratio = result.ratio === 'N/A' ? 'N/A' : result.ratio + '%';
-                    const countCNC24Url = `https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2024-luxembourg&taxon_id=${taxonId}&quality_grade=research`;
-                    const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research`;
+                    const countCNC24Url = `https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2024-luxembourg&user_id=paul_luap&taxon_id=${taxonId}&quality_grade=research`;
+                    const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research&user_id=paul_luap`;
 
                     // Create a table row and append to tbody
                     const row = document.createElement('tr');
