@@ -26,6 +26,11 @@
 
 <h2>iNaturalist Species Counts</h2>
 
+<!-- Add an input field for user_id -->
+<label for="user-id">Enter User ID:</label>
+<input type="text" id="user-id" value="">
+<button onclick="reloadData()">Reload Data</button> <!-- Add reload button -->
+
 <table id="species-table">
   <thead>
     <tr>
@@ -45,13 +50,13 @@
 
 <script>
     // Function to fetch data for a given page
-    function fetchData(pageNumber) {
-        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=city-nature-challenge-2024-luxembourg&quality_grade=research&user_id=paul_luap&page=${pageNumber}&per_page=500&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
+    function fetchData(pageNumber, userId) {
+        return fetch(`https://api.inaturalist.org/v2/observations/species_counts?project_id=city-nature-challenge-2024-luxembourg&quality_grade=research&user_id=${userId}&page=${pageNumber}&per_page=500&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count`)
             .then(response => response.json());
     }
 
     // Function to fetch count data for taxon IDs
-    function fetchCountData(taxonIds) {
+    function fetchCountData(taxonIds, userId) {
         const batchSize = 500;
         const batches = [];
         for (let i = 0; i < taxonIds.length; i += batchSize) {
@@ -60,7 +65,7 @@
         }
         const promises = batches.map(batch => {
             const taxonIdString = batch.join(',');
-            return fetch(`https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${taxonIdString}&user_id=paul_luap&quality_grade=research&fields=taxon.id,count`)
+            return fetch(`https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${taxonIdString}&user_id=${userId}&quality_grade=research&fields=taxon.id,count`)
                 .then(response => response.json());
         });
         return Promise.all(promises).then(results => results.reduce((acc, val) => acc.concat(val.results), []));
@@ -71,9 +76,10 @@
         // Get the tbody element to append data
         const tbody = document.getElementById('species-data');
         const taxonIds = results.map(result => result.taxon.id);
+        const userId = document.getElementById('user-id').value; // Get user_id from input field
 
         // Fetch count data for all taxon IDs
-        fetchCountData(taxonIds)
+        fetchCountData(taxonIds, userId)
             .then(countData => {
                 // Map taxon ID to count
                 const countMap = {};
@@ -96,6 +102,9 @@
                 // Sort the data by ratio (descending order) after setting "NaN" to "0"
                 processedResults.sort((a, b) => b.ratio - a.ratio);
 
+                // Clear existing table rows
+                tbody.innerHTML = '';
+
                 // Loop through sorted results and create table rows
                 processedResults.forEach((result, index) => { // Add index parameter to forEach
                     const taxonId = result.taxon.id;
@@ -104,8 +113,8 @@
                     const originalCount = result.count;
                     const newCount = result.totalCount;
                     const ratio = result.ratio === 'N/A' ? 'N/A' : result.ratio + '%';
-                    const countCNC24Url = `https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2024-luxembourg&user_id=paul_luap&taxon_id=${taxonId}&quality_grade=research`;
-                    const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research&user_id=paul_luap`;
+                    const countCNC24Url = `https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2024-luxembourg&user_id=${userId}&taxon_id=${taxonId}&quality_grade=research`;
+                    const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research&user_id=${userId}`;
 
                     // Create a table row and append to tbody
                     const row = document.createElement('tr');
@@ -128,7 +137,8 @@
 
     // Function to fetch all data recursively
     function fetchAllData(pageNumber = 1, allResults = []) {
-        fetchData(pageNumber)
+        const userId = document.getElementById('user-id').value; // Get user_id from input field
+        fetchData(pageNumber, userId)
             .then(data => {
                 const results = data.results;
                 allResults.push(...results);
@@ -145,8 +155,24 @@
             });
     }
 
-    // Start fetching data
-    fetchAllData();
+    // Function to reload data when button is clicked
+    function reloadData() {
+        // Get the user_id from the input field
+        const userId = document.getElementById('user-id').value;
+        
+        // Check if user_id is entered
+        if (userId.trim() === '') {
+            alert('Please enter a user ID.');
+            return;
+        }
+        
+        // Clear existing data
+        const tbody = document.getElementById('species-data');
+        tbody.innerHTML = '';
+        
+        // Fetch new data
+        fetchAllData();
+    }
 
 </script>
 
