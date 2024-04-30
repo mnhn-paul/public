@@ -33,7 +33,7 @@
       <th>Taxon ID</th>
       <th>Taxon Name</th>
       <th>Iconic Taxon Name</th>
-      <th>count CNC23</th>
+      <th>count CNC24</th>
       <th>total count</th>
       <th>Ratio (%)</th>
     </tr>
@@ -104,7 +104,7 @@
                     const originalCount = result.count;
                     const newCount = result.totalCount;
                     const ratio = result.ratio === 'N/A' ? 'N/A' : result.ratio + '%';
-                    const countCNC23Url = `https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2024-luxembourg&taxon_id=${taxonId}&quality_grade=research`;
+                    const countCNC24Url = `https://inaturalist.lu/observations?place_id=120582&project_id=city-nature-challenge-2024-luxembourg&taxon_id=${taxonId}&quality_grade=research`;
                     const totalCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${taxonId}&quality_grade=research`;
 
                     // Create a table row and append to tbody
@@ -114,7 +114,7 @@
                         <td><a href="https://inaturalist.lu/taxa/${taxonId}" target="_blank">${taxonId}</a></td>
                         <td><span class="italic">${taxonName}</span></td>
                         <td>${iconicTaxonName}</td>
-                        <td><a href="${countCNC23Url}" target="_blank">${originalCount}</a></td>
+                        <td><a href="${countCNC24Url}" target="_blank">${originalCount}</a></td>
                         <td><a href="${totalCountUrl}" target="_blank">${newCount}</a></td>
                         <td>${ratio}</td>
                     `;
