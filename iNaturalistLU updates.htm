@@ -145,6 +145,18 @@
                 });
         }
 
+        // Function to fetch the total number of results for a date
+        function fetchTotalResults(date) {
+            const url = `${baseApiUrl}&updated_since=${date}&page=1&per_page=0`;  // No need to fetch actual data, just total count
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => data.total_results || 0)
+                .catch(error => {
+                    console.error('Error fetching total results:', error);
+                    return 0;
+                });
+        }
+
         // Function to load all data recursively (pagination loop)
         async function loadAllData(date) {
             loadingIndicator.style.display = 'block';
@@ -203,21 +215,29 @@
             });
         });
 
-        // Load more data when the "Load More" button is clicked
+        // Handle "Load More" button click
         loadMoreButton.addEventListener('click', () => {
-            currentPage++;
             loadingIndicator.style.display = 'block';
             fetchData(currentPage, selectedDate).then(totalResults => {
                 loadingIndicator.style.display = 'none';
                 if (currentPage * perPage >= totalResults) {
-                    loadMoreButton.style.display = 'none';  // Hide the button if no more pages
+                    loadMoreButton.style.display = 'none';  // Hide "Load More" button if no more results
                 }
             });
         });
 
-        // Load all data when the "Load All" button is clicked
+        // Handle "Load All" button click
         loadAllButton.addEventListener('click', () => {
             loadAllData(selectedDate);
+        });
+
+        // On page load, fetch the total number of results for "Today" and "Yesterday"
+        fetchTotalResults(formattedToday).then(totalToday => {
+            updatesTodayButton.textContent = `Updates Today (${totalToday})`;
+        });
+
+        fetchTotalResults(formattedYesterday).then(totalYesterday => {
+            updatesYesterdayButton.textContent = `Updates Since Yesterday (${totalYesterday})`;
         });
     </script>
 </body>
