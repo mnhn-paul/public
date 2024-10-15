@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iNaturalist Observations - Choose Date Range</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid black;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        #loading {
+            text-align: center;
+            font-weight: bold;
+        }
+        #pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #pagination button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+        }
+        #date-buttons {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #date-buttons button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>iNaturalist Observations</h1>
+
+    <div id="date-buttons">
+        <button id="updates-today">Updates Today</button>
+        <button id="updates-yesterday">Updates Since Yesterday</button>
+    </div>
+
+    <table id="observations-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Observed On</th>
+                <th>Updated At</th>
+                <th>Quality Grade</th>
+                <th>Taxon Name</th>
+                <th>Taxon Rank</th>
+                <th>User Login</th>
+                <th>User Name</th>
+                <th>User ORCID</th>
+                <th>Location</th>
+                <th>Positional Accuracy</th>
+                <th>Geoprivacy</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data will be populated here by JavaScript -->
+        </tbody>
+    </table>
+
+    <div id="loading" style="display: none;">Loading...</div>
+
+    <div id="pagination">
+        <button id="load-more" style="display: none;">Load More</button>
+        <button id="load-all" style="display: none;">Load All</button>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const perPage = 10;
+        let loadingAll = false;  // Track if we're in "Load All" mode
+        let selectedDate = '';   // Will store the selected date for the API call
+
+        const tableBody = document.querySelector('#observations-table tbody');
+        const loadMoreButton = document.getElementById('load-more');
+        const loadAllButton = document.getElementById('load-all');
+        const loadingIndicator = document.getElementById('loading');
+        const updatesTodayButton = document.getElementById('updates-today');
+        const updatesYesterdayButton = document.getElementById('updates-yesterday');
+
+        // Get the current date and subtract one day
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+
+        // Format the date as YYYY-MM-DD for the API call
+        const formattedToday = today.toISOString().split('T')[0];
+        const formattedYesterday = yesterday.toISOString().split('T')[0];
+
+        // Generate the base API URL
+        const baseApiUrl = `https://api.inaturalist.org/v2/observations?place_id=137976&quality_grade=casual,research&order=desc&order_by=created_at&fields=id%2Cobserved_on%2Cupdated_at%2Cquality_grade%2Ctaxon.name%2Ctaxon.rank%2Cuser.login%2Cuser.name%2Cuser.orcid%2Clocation%2Cpositional_accuracy%2Cgeoprivacy`;
+
+        // Function to fetch data from the API
+        function fetchData(page, date) {
+            const url = `${baseApiUrl}&updated_since=${date}&page=${page}&per_page=${perPage}`;
+            return fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.results && data.results.length > 0) {
+                        data.results.forEach(observation => {
+                            // Create a new row for each observation
+                            const row = document.createElement('tr');
+
+                            // Add cells with data
+                            row.innerHTML = `
+                                <td><a href="https://inaturalist.lu/observations/${observation.id}" target="_blank">${observation.id}</a></td>
+                                <td>${observation.observed_on || 'N/A'}</td>
+                                <td>${observation.updated_at || 'N/A'}</td>
+                                <td>${observation.quality_grade || 'N/A'}</td>
+                                <td>${observation.taxon ? observation.taxon.name : 'N/A'}</td>
+                                <td>${observation.taxon ? observation.taxon.rank : 'N/A'}</td>
+                                <td>${observation.user ? observation.user.login : 'N/A'}</td>
+                                <td>${observation.user ? observation.user.name : 'N/A'}</td>
+                                <td>${observation.user ? observation.user.orcid : 'N/A'}</td>
+                                <td>${observation.location || 'N/A'}</td>
+                                <td>${observation.positional_accuracy || 'N/A'}</td>
+                                <td>${observation.geoprivacy || 'N/A'}</td>
+                            `;
+
+                            // Append the row to the table body
+                            tableBody.appendChild(row);
+                        });
+
+                        return data.total_results;  // Return total results for pagination check
+                    }
+                    return 0;
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    loadingIndicator.textContent = 'Failed to load data';
+                    return 0;
+                });
+        }
+
+        // Function to load all data recursively (pagination loop)
+        async function loadAllData(date) {
+            loadingIndicator.style.display = 'block';
+            loadingAll = true;
+            loadMoreButton.style.display = 'none';
+            loadAllButton.style.display = 'none';
+
+            let totalResults;
+            do {
+                totalResults = await fetchData(currentPage, date);
+                currentPage++;
+            } while (currentPage * perPage <= totalResults);
+
+            loadingIndicator.style.display = 'none';
+            loadingAll = false;
+        }
+
+        // Function to clear the table and reset the page number
+        function resetTable() {
+            tableBody.innerHTML = '';  // Clear previous table data
+            currentPage = 1;           // Reset the page number
+            loadMoreButton.style.display = 'none';  // Hide "Load More" button initially
+            loadAllButton.style.display = 'none';   // Hide "Load All" button initially
+            loadingIndicator.style.display = 'none';  // Hide loading indicator initially
+        }
+
+        // Handle "Updates Today" button click
+        updatesTodayButton.addEventListener('click', () => {
+            resetTable();  // Reset the table before loading new data
+            selectedDate = formattedToday;
+            loadingIndicator.style.display = 'block';
+
+            // Fetch the first page of data for today's date
+            fetchData(currentPage, selectedDate).then(totalResults => {
+                loadingIndicator.style.display = 'none';
+                if (totalResults > perPage) {
+                    loadMoreButton.style.display = 'block';  // Show "Load More" button
+                    loadAllButton.style.display = 'block';   // Show "Load All" button
+                }
+            });
+        });
+
+        // Handle "Updates Since Yesterday" button click
+        updatesYesterdayButton.addEventListener('click', () => {
+            resetTable();  // Reset the table before loading new data
+            selectedDate = formattedYesterday;
+            loadingIndicator.style.display = 'block';
+
+            // Fetch the first page of data for yesterday's date
+            fetchData(currentPage, selectedDate).then(totalResults => {
+                loadingIndicator.style.display = 'none';
+                if (totalResults > perPage) {
+                    loadMoreButton.style.display = 'block';  // Show "Load More" button
+                    loadAllButton.style.display = 'block';   // Show "Load All" button
+                }
+            });
+        });
+
+        // Load more data when the "Load More" button is clicked
+        loadMoreButton.addEventListener('click', () => {
+            currentPage++;
+            loadingIndicator.style.display = 'block';
+            fetchData(currentPage, selectedDate).then(totalResults => {
+                loadingIndicator.style.display = 'none';
+                if (currentPage * perPage >= totalResults) {
+                    loadMoreButton.style.display = 'none';  // Hide the button if no more pages
+                }
+            });
+        });
+
+        // Load all data when the "Load All" button is clicked
+        loadAllButton.addEventListener('click', () => {
+            loadAllData(selectedDate);
+        });
+    </script>
+</body>
+</html>
