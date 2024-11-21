@@ -18,6 +18,16 @@
             background-color: #f2f2f2;
             text-align: left;
         }
+        td.italic {
+            font-style: italic;
+        }
+        a {
+            color: blue;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
         .controls {
             margin-bottom: 20px;
         }
@@ -34,19 +44,28 @@
             <option value="verifiable=true" selected>Verifiable</option>
             <option value="quality_grade=research">Research Quality</option>
         </select>
+
+        <label for="rank">Taxonomic Rank (hrank):</label>
+        <select id="rank">
+            <option value="genus" selected>Genus</option>
+            <option value="species">Species</option>
+        </select>
+
         <label for="start-date">Start Date (d1):</label>
         <input type="date" id="start-date">
+
         <label for="end-date">End Date (d2):</label>
         <input type="date" id="end-date">
+
         <button id="run-query">Run Query</button>
     </div>
     <p id="total-results">Total species detected: Loading...</p>
     <table>
         <thead>
             <tr>
-                <th>Iconic Taxon Name</th>
-                <th>Taxon ID</th>
                 <th>Taxon Name</th>
+                <th>Taxon ID</th>
+                <th>Iconic Taxon Name</th>
                 <th>Observation Count</th>
             </tr>
         </thead>
@@ -56,16 +75,37 @@
     </table>
 
     <script>
+        // Helper function to format the date for display as dd/mm/yyyy
+        function formatDateForDisplay(dateStr) {
+            if (!dateStr) return "";
+            const date = new Date(dateStr);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}/${month}/${year}`;
+        }
+
+        // Helper function to convert date from dd/mm/yyyy to yyyy-mm-dd
+        function formatDateForApi(dateStr) {
+            if (!dateStr) return "";
+            return new Date(dateStr).toISOString().split('T')[0];
+        }
+
         document.getElementById('run-query').addEventListener('click', () => {
-            // Get selected filter
+            // Get selected filter and rank
             const filter = document.getElementById('filter').value;
+            const hrank = document.getElementById('rank').value;
 
             // Get selected dates
-            const d1 = document.getElementById('start-date').value;
-            const d2 = document.getElementById('end-date').value;
+            const d1Raw = document.getElementById('start-date').value;
+            const d2Raw = document.getElementById('end-date').value;
+
+            // Format dates for API
+            const d1 = formatDateForApi(d1Raw);
+            const d2 = formatDateForApi(d2Raw);
 
             // Build the API URL dynamically
-            let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?${filter}&place_id=120582&fields=taxon.iconic_taxon_name,taxon.id,taxon.name,count&hrank=genus`;
+            let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?${filter}&hrank=${hrank}&place_id=120582&fields=taxon.iconic_taxon_name,taxon.id,taxon.name,count`;
             if (d1) apiUrl += `&d1=${d1}`;
             if (d2) apiUrl += `&d2=${d2}`;
 
@@ -91,19 +131,31 @@
                         data.results.forEach(item => {
                             const row = document.createElement('tr');
 
-                            // Create cells for each field
+                            // Taxon Name (italic)
+                            const taxonNameCell = document.createElement('td');
+                            taxonNameCell.textContent = item.taxon.name || 'N/A';
+                            taxonNameCell.classList.add('italic');
+                            row.appendChild(taxonNameCell);
+
+                            // Taxon ID (hyperlink)
+                            const taxonIdCell = document.createElement('td');
+                            if (item.taxon.id) {
+                                const link = document.createElement('a');
+                                link.href = `https://inaturalist.lu/taxa/${item.taxon.id}`;
+                                link.textContent = item.taxon.id;
+                                link.target = "_blank"; // Open link in a new tab
+                                taxonIdCell.appendChild(link);
+                            } else {
+                                taxonIdCell.textContent = 'N/A';
+                            }
+                            row.appendChild(taxonIdCell);
+
+                            // Iconic Taxon Name
                             const iconicTaxonCell = document.createElement('td');
                             iconicTaxonCell.textContent = item.taxon.iconic_taxon_name || 'N/A';
                             row.appendChild(iconicTaxonCell);
 
-                            const taxonIdCell = document.createElement('td');
-                            taxonIdCell.textContent = item.taxon.id || 'N/A';
-                            row.appendChild(taxonIdCell);
-
-                            const taxonNameCell = document.createElement('td');
-                            taxonNameCell.textContent = item.taxon.name || 'N/A';
-                            row.appendChild(taxonNameCell);
-
+                            // Observation Count
                             const countCell = document.createElement('td');
                             countCell.textContent = item.count || 'N/A';
                             row.appendChild(countCell);
