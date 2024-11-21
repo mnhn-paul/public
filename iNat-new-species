@@ -33,6 +33,16 @@
             max-height: 200px;
             overflow-y: auto;
         }
+        .sortable:hover {
+            cursor: pointer;
+            background-color: #f1f1f1;
+        }
+        .sorted-asc::after {
+            content: ' ↑';
+        }
+        .sorted-desc::after {
+            content: ' ↓';
+        }
     </style>
 </head>
 <body>
@@ -70,12 +80,12 @@
     <table>
         <thead>
             <tr>
-                <th>Taxon Name</th>
-                <th>Taxon ID</th>
-                <th>Iconic Taxon Name</th>
-                <th>Observation Count</th>
-                <th>Total</th>
-                <th>Ratio</th>
+                <th class="sortable" data-column="name">Taxon Name</th>
+                <th class="sortable" data-column="id">Taxon ID</th>
+                <th class="sortable" data-column="iconic">Iconic Taxon Name</th>
+                <th class="sortable" data-column="count">Observation Count</th>
+                <th class="sortable" data-column="total">Total</th>
+                <th class="sortable" data-column="ratio">Ratio</th>
             </tr>
         </thead>
         <tbody id="data-table">
@@ -203,7 +213,7 @@
                 const taxonIdLink = document.createElement('a');
                 taxonIdLink.href = `https://inaturalist.lu/taxa/${item.taxon.id}`;
                 taxonIdLink.textContent = item.taxon.id;
-                taxonIdLink.target = '_blank';
+                taxonIdLink.target = '_blank';  // Open in new tab
                 taxonIdCell.appendChild(taxonIdLink);
                 row.appendChild(taxonIdCell);
 
@@ -215,22 +225,20 @@
                 const observationCountLink = document.createElement('a');
                 observationCountLink.href = `https://inaturalist.lu/observations?d1=${formatDateForApi(document.getElementById('start-date').value)}&d2=${formatDateForApi(document.getElementById('end-date').value)}&place_id=120582&${document.getElementById('filter').value}&taxon_id=${item.taxon.id}`;
                 observationCountLink.textContent = item.count || 'N/A';
+                observationCountLink.target = '_blank';  // Open in new tab
                 observationCountCell.appendChild(observationCountLink);
                 row.appendChild(observationCountCell);
 
-                row.appendChild(document.createElement('td')); // Total column (initially empty)
-                row.appendChild(document.createElement('td')); // Ratio column (initially empty)
+                const totalCell = document.createElement('td');
+                totalCell.textContent = 'Loading...';  // Placeholder
+                row.appendChild(totalCell);
+
+                const ratioCell = document.createElement('td');
+                ratioCell.textContent = 'Loading...';  // Placeholder
+                row.appendChild(ratioCell);
 
                 tableBody.appendChild(row);
             }
-
-            return row;
-        }
-
-        function logApiCall(url) {
-            const logItem = document.createElement('li');
-            logItem.textContent = url;
-            document.getElementById('api-log-list').appendChild(logItem);
         }
 
         function fetchCountsInBatches(taxonIds, filter) {
@@ -279,7 +287,53 @@
 
             fetchBatch();
         }
-    </script>
 
+        function logApiCall(url) {
+            const logItem = document.createElement('li');
+            logItem.textContent = url;
+            document.getElementById('api-log-list').appendChild(logItem);
+        }
+
+        function sortTable(columnIndex, ascending) {
+            const table = document.getElementById('data-table');
+            const rows = Array.from(table.getElementsByTagName('tr'));
+
+            rows.sort((rowA, rowB) => {
+                const cellA = rowA.children[columnIndex].textContent.trim();
+                const cellB = rowB.children[columnIndex].textContent.trim();
+
+                let comparison = 0;
+
+                if (columnIndex === 4 || columnIndex === 5) {  // Total and Ratio columns (numeric values)
+                    comparison = parseFloat(cellA) - parseFloat(cellB);
+                } else {  // Text columns
+                    comparison = cellA.localeCompare(cellB);
+                }
+
+                return ascending ? comparison : -comparison;
+            });
+
+            rows.forEach(row => table.appendChild(row));  // Reorder the rows in the table
+        }
+
+        // Sorting functionality
+        document.querySelectorAll('.sortable').forEach(header => {
+            let isAscending = false;
+            header.addEventListener('click', () => {
+                const columnIndex = header.getAttribute('data-column') === 'name' ? 0 :
+                                    header.getAttribute('data-column') === 'id' ? 1 :
+                                    header.getAttribute('data-column') === 'iconic' ? 2 :
+                                    header.getAttribute('data-column') === 'count' ? 3 :
+                                    header.getAttribute('data-column') === 'total' ? 4 : 5;
+
+                isAscending = !isAscending;
+                sortTable(columnIndex, isAscending);
+
+                // Toggle sorting indicator
+                header.classList.toggle('sorted-asc', isAscending);
+                header.classList.toggle('sorted-desc', !isAscending);
+            });
+        });
+    </script>
 </body>
 </html>
