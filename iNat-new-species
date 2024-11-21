@@ -8,6 +8,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 20px;
         }
         th, td {
             border: 1px solid #ddd;
@@ -17,16 +18,36 @@
             background-color: #f2f2f2;
             text-align: left;
         }
+        .controls {
+            margin-bottom: 20px;
+        }
+        .controls label, .controls select, .controls input, .controls button {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <h1>Species Observations</h1>
+    <div class="controls">
+        <label for="filter">Filter:</label>
+        <select id="filter">
+            <option value="verifiable=true" selected>Verifiable</option>
+            <option value="quality_grade=research">Research Quality</option>
+        </select>
+        <label for="start-date">Start Date (d1):</label>
+        <input type="date" id="start-date">
+        <label for="end-date">End Date (d2):</label>
+        <input type="date" id="end-date">
+        <button id="run-query">Run Query</button>
+    </div>
+    <p id="total-results">Total species detected: Loading...</p>
     <table>
         <thead>
             <tr>
                 <th>Iconic Taxon Name</th>
                 <th>Taxon ID</th>
                 <th>Taxon Name</th>
+                <th>Observation Count</th>
             </tr>
         </thead>
         <tbody id="data-table">
@@ -35,61 +56,83 @@
     </table>
 
     <script>
-        // API URL
-        const apiUrl = "https://api.inaturalist.org/v2/observations/species_counts?verifiable=true&d1=2024-11-18&place_id=120582&fields=taxon.iconic_taxon_name,taxon.id,taxon.name";
+        document.getElementById('run-query').addEventListener('click', () => {
+            // Get selected filter
+            const filter = document.getElementById('filter').value;
 
-        // Fetch data from the API
-        fetch(apiUrl)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Select the table body
-                const tableBody = document.getElementById('data-table');
+            // Get selected dates
+            const d1 = document.getElementById('start-date').value;
+            const d2 = document.getElementById('end-date').value;
 
-                // Ensure data exists and iterate over it
-                if (data.results) {
-                    data.results.forEach(item => {
+            // Build the API URL dynamically
+            let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?${filter}&place_id=120582&fields=taxon.iconic_taxon_name,taxon.id,taxon.name,count&hrank=genus`;
+            if (d1) apiUrl += `&d1=${d1}`;
+            if (d2) apiUrl += `&d2=${d2}`;
+
+            // Fetch data from the API
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Display total results
+                    const totalResults = data.total_results || 0;
+                    document.getElementById('total-results').textContent = `Total species detected: ${totalResults}`;
+
+                    // Select the table body
+                    const tableBody = document.getElementById('data-table');
+                    tableBody.innerHTML = ""; // Clear previous data
+
+                    // Ensure data exists and iterate over it
+                    if (data.results) {
+                        data.results.forEach(item => {
+                            const row = document.createElement('tr');
+
+                            // Create cells for each field
+                            const iconicTaxonCell = document.createElement('td');
+                            iconicTaxonCell.textContent = item.taxon.iconic_taxon_name || 'N/A';
+                            row.appendChild(iconicTaxonCell);
+
+                            const taxonIdCell = document.createElement('td');
+                            taxonIdCell.textContent = item.taxon.id || 'N/A';
+                            row.appendChild(taxonIdCell);
+
+                            const taxonNameCell = document.createElement('td');
+                            taxonNameCell.textContent = item.taxon.name || 'N/A';
+                            row.appendChild(taxonNameCell);
+
+                            const countCell = document.createElement('td');
+                            countCell.textContent = item.count || 'N/A';
+                            row.appendChild(countCell);
+
+                            // Append the row to the table body
+                            tableBody.appendChild(row);
+                        });
+                    } else {
                         const row = document.createElement('tr');
-
-                        // Create cells for each field
-                        const iconicTaxonCell = document.createElement('td');
-                        iconicTaxonCell.textContent = item.taxon.iconic_taxon_name || 'N/A';
-                        row.appendChild(iconicTaxonCell);
-
-                        const taxonIdCell = document.createElement('td');
-                        taxonIdCell.textContent = item.taxon.id || 'N/A';
-                        row.appendChild(taxonIdCell);
-
-                        const taxonNameCell = document.createElement('td');
-                        taxonNameCell.textContent = item.taxon.name || 'N/A';
-                        row.appendChild(taxonNameCell);
-
-                        // Append the row to the table body
+                        const cell = document.createElement('td');
+                        cell.textContent = "No data available";
+                        cell.colSpan = 4;
+                        row.appendChild(cell);
                         tableBody.appendChild(row);
-                    });
-                } else {
+                    }
+                })
+                .catch(error => {
+                    console.error("Error fetching the data:", error);
+                    document.getElementById('total-results').textContent = "Total species detected: Error loading data";
+                    const tableBody = document.getElementById('data-table');
+                    tableBody.innerHTML = ""; // Clear previous data
                     const row = document.createElement('tr');
                     const cell = document.createElement('td');
-                    cell.textContent = "No data available";
-                    cell.colSpan = 3;
+                    cell.textContent = "Error loading data";
+                    cell.colSpan = 4;
                     row.appendChild(cell);
                     tableBody.appendChild(row);
-                }
-            })
-            .catch(error => {
-                console.error("Error fetching the data:", error);
-                const tableBody = document.getElementById('data-table');
-                const row = document.createElement('tr');
-                const cell = document.createElement('td');
-                cell.textContent = "Error loading data";
-                cell.colSpan = 3;
-                row.appendChild(cell);
-                tableBody.appendChild(row);
-            });
+                });
+        });
     </script>
 </body>
 </html>
