@@ -3,337 +3,313 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Species Count</title>
+    <title>iNaturalist Observations</title>
     <style>
-        .italic {
-            font-style: italic;
-        }
-        #loading-status {
-            display: none;
-            font-size: 1.2em;
-            color: #888;
-        }
         table {
             width: 100%;
             border-collapse: collapse;
         }
-        table, th, td {
-            border: 1px solid black;
-        }
         th, td {
+            border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
         }
-        #api-log {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f9f9f9;
-            border: 1px solid #ccc;
-            font-size: 0.9em;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .sortable:hover {
+        th {
             cursor: pointer;
-            background-color: #f1f1f1;
+            background-color: #f2f2f2;
         }
-        .sorted-asc::after {
-            content: ' ↑';
+        th.sorted-asc::after {
+            content: " ▲";
         }
-        .sorted-desc::after {
-            content: ' ↓';
+        th.sorted-desc::after {
+            content: " ▼";
+        }
+        .italic {
+            font-style: italic;
+        }
+        #api-logs {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 20px;
+        }
+        #loading-status {
+            color: red;
+            font-weight: bold;
+            display: none;
         }
     </style>
 </head>
 <body>
-
-    <h1>Species Count Data</h1>
-
-    <div>
-        <label for="filter">Select Filter:</label>
-        <select id="filter">
+    <h1>iNaturalist Observations</h1>
+    <label>
+        Quality Filter:
+        <select id="quality-filter">
             <option value="verifiable=true">Verifiable</option>
-            <option value="quality_grade=research">Quality Grade: Research</option>
+            <option value="quality_grade=research">Research Grade</option>
         </select>
-        
-        <label for="rank">Select Rank:</label>
-        <select id="rank">
+    </label>
+
+    <label>
+        Taxonomic Rank:
+        <select id="taxonomic-rank">
             <option value="genus">Genus</option>
             <option value="species">Species</option>
         </select>
-        
-        <br>
+    </label>
 
-        <label for="start-date">Start Date:</label>
+    <label>
+        Start Date:
         <input type="date" id="start-date">
-        
-        <label for="end-date">End Date:</label>
+    </label>
+    <label>
+        End Date:
         <input type="date" id="end-date">
-        
-        <button id="run-query">Run Query</button>
-    </div>
+    </label>
 
-    <div id="loading-status">Loading data...</div>
+    <fieldset>
+        <legend>Iconic Taxa Filter:</legend>
+        <label><input type="checkbox" value="Actinopterygii"> Actinopterygii</label>
+        <label><input type="checkbox" value="Animalia"> Animalia</label>
+        <label><input type="checkbox" value="Amphibia"> Amphibia</label>
+        <label><input type="checkbox" value="Arachnida"> Arachnida</label>
+        <label><input type="checkbox" value="Aves"> Aves</label>
+        <label><input type="checkbox" value="Chromista"> Chromista</label>
+        <label><input type="checkbox" value="Fungi"> Fungi</label>
+        <label><input type="checkbox" value="Insecta"> Insecta</label>
+        <label><input type="checkbox" value="Mammalia"> Mammalia</label>
+        <label><input type="checkbox" value="Mollusca"> Mollusca</label>
+        <label><input type="checkbox" value="Reptilia"> Reptilia</label>
+        <label><input type="checkbox" value="Plantae"> Plantae</label>
+        <label><input type="checkbox" value="Protozoa"> Protozoa</label>
+        <label><input type="checkbox" value="unknown"> Unknown</label>
+    </fieldset>
 
-    <div id="total-results">Total species detected: 0</div>
-
+    <button id="run-query">Run Query</button>
+    <p id="loading-status">Loading data, please wait...</p>
+    <p id="total-results"></p>
     <table>
         <thead>
             <tr>
-                <th class="sortable" data-column="name">Taxon Name</th>
-                <th class="sortable" data-column="id">Taxon ID</th>
-                <th class="sortable" data-column="iconic">Iconic Taxon Name</th>
-                <th class="sortable" data-column="count">Observation Count</th>
-                <th class="sortable" data-column="total">Total</th>
-                <th class="sortable" data-column="ratio">Ratio</th>
+                <th class="sortable" data-column="0">Taxon Name</th>
+                <th class="sortable" data-column="1">Taxon ID</th>
+                <th class="sortable" data-column="2">Iconic Taxon Name</th>
+                <th class="sortable" data-column="3">Observation Count</th>
+                <th class="sortable" data-column="4">Total</th>
+                <th class="sortable" data-column="5">Ratio (%)</th>
             </tr>
         </thead>
-        <tbody id="data-table">
-        </tbody>
+        <tbody id="data-table"></tbody>
     </table>
 
-    <div id="api-log">
-        <h3>API Calls:</h3>
-        <ul id="api-log-list"></ul>
-    </div>
+    <h3>API Calls</h3>
+    <div id="api-logs"></div>
 
     <script>
-        function formatDateForApi(dateStr) {
-            if (!dateStr) return "";
-            return new Date(dateStr).toISOString().split('T')[0];
+        const apiLogDiv = document.getElementById('api-logs');
+        let currentSortColumn = null;
+        let sortAscending = true;
+
+        function logApiCall(url) {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = url;
+            apiLogDiv.appendChild(logEntry);
         }
 
-        document.getElementById('run-query').addEventListener('click', () => {
-            // Clear previous table data
-            const tableBody = document.getElementById('data-table');
-            tableBody.innerHTML = ''; // This clears the existing table rows
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
 
-            // Reset the total species count and API log
-            document.getElementById('total-results').textContent = "Total species detected: 0";
-            document.getElementById('api-log-list').innerHTML = '';
+        function sortTable(columnIndex) {
+            const rows = Array.from(document.getElementById('data-table').rows);
 
-            const filter = document.getElementById('filter').value;
-            const hrank = document.getElementById('rank').value;
+            rows.sort((a, b) => {
+                const cellA = a.cells[columnIndex].textContent;
+                const cellB = b.cells[columnIndex].textContent;
 
-            const d1Raw = document.getElementById('start-date').value;
-            const d2Raw = document.getElementById('end-date').value;
+                const valueA = isNaN(cellA) ? cellA : parseFloat(cellA);
+                const valueB = isNaN(cellB) ? cellB : parseFloat(cellB);
 
-            const d1 = formatDateForApi(d1Raw);
-            const d2 = formatDateForApi(d2Raw);
+                if (valueA < valueB) return sortAscending ? -1 : 1;
+                if (valueA > valueB) return sortAscending ? 1 : -1;
+                return 0;
+            });
 
-            let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?${filter}&hrank=${hrank}&place_id=120582&per_page=500&fields=taxon.iconic_taxon_name,taxon.id,taxon.name,count`;
-            if (d1) apiUrl += `&d1=${d1}`;
-            if (d2) apiUrl += `&d2=${d2}`;
+            rows.forEach(row => document.getElementById('data-table').appendChild(row));
+        }
 
-            document.getElementById('loading-status').style.display = 'block';
+        document.querySelectorAll('.sortable').forEach(header => {
+            header.addEventListener('click', () => {
+                const columnIndex = parseInt(header.dataset.column, 10);
 
-            fetchDataWithPagination(apiUrl);
+                if (currentSortColumn === columnIndex) {
+                    sortAscending = !sortAscending;
+                } else {
+                    currentSortColumn = columnIndex;
+                    sortAscending = true;
+                }
+
+                document.querySelectorAll('th').forEach(th => th.classList.remove('sorted-asc', 'sorted-desc'));
+                header.classList.add(sortAscending ? 'sorted-asc' : 'sorted-desc');
+
+                sortTable(columnIndex);
+            });
         });
 
-        function fetchDataWithPagination(apiUrl) {
-            let page = 1;
-            let totalResults = 0;
-            let taxonIds = [];
+        document.getElementById('run-query').addEventListener('click', async () => {
+            const qualityFilter = document.getElementById('quality-filter').value;
+            const taxonomicRank = document.getElementById('taxonomic-rank').value;
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const iconicTaxa = Array.from(document.querySelectorAll('fieldset input:checked'))
+                .map(input => input.value)
+                .join(',');
 
-            function fetchPage() {
-                const url = apiUrl + `&page=${page}`;
-                logApiCall(url);
+            let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,count&${qualityFilter}&hrank=${taxonomicRank}`;
+            if (startDate) apiUrl += `&d1=${startDate}`;
+            if (endDate) apiUrl += `&d2=${endDate}`;
+            if (iconicTaxa) apiUrl += `&iconic_taxa=${iconicTaxa}`;
 
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (page === 1) {
-                            totalResults = data.total_results || 0;
-                            document.getElementById('total-results').textContent = `Total species detected: ${totalResults}`;
-                        }
+            document.getElementById('loading-status').style.display = 'block';
+            document.getElementById('total-results').textContent = '';
+            document.getElementById('data-table').innerHTML = '';
+            apiLogDiv.innerHTML = '';
 
-                        if (data.results) {
-                            data.results.forEach(item => {
-                                taxonIds.push(item.taxon.id);
-                                addRowToTable(item);
-                            });
-                        }
+            await fetchDataWithPagination(apiUrl, startDate, endDate, qualityFilter);
+        });
 
-                        if (page * 500 < totalResults) {
-                            page++;
-                            setTimeout(fetchPage, 1000);
-                        } else {
-                            fetchCountsInBatches(taxonIds, document.getElementById('filter').value);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching the data:', error);
-                        document.getElementById('total-results').textContent = "Error loading data";
-                        handleRetry(error, fetchPage);
-                    });
-            }
+        async function fetchDataWithPagination(apiUrl, startDate, endDate, qualityFilter) {
+            let allResults = [];
+            let currentPage = 1;
 
-            fetchPage();
-        }
+            while (true) {
+                const paginatedUrl = `${apiUrl}&page=${currentPage}`;
+                logApiCall(paginatedUrl);
 
-        function handleRetry(error, fetchPageFunc) {
-            const MAX_RETRIES = 5;
-            let retries = 0;
+                try {
+                    const response = await fetch(paginatedUrl);
+                    if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                    const data = await response.json();
 
-            function tryAgain() {
-                if (retries < MAX_RETRIES) {
-                    retries++;
-                    const delay = Math.pow(2, retries) * 1000;
-                    console.log(`Retrying in ${delay / 1000}s...`);
-                    setTimeout(fetchPageFunc, delay);
-                } else {
-                    console.log('Max retries reached. Giving up.');
-                    document.getElementById('loading-status').style.display = 'none';
+                    allResults = allResults.concat(data.results);
+                    if (data.results.length === 0 || allResults.length >= data.total_results) break;
+
+                    currentPage++;
+                    await delay(1000);
+                } catch (error) {
+                    console.error('Error during pagination:', error);
+                    break;
                 }
             }
 
-            if (error && error.status === 429) {
-                tryAgain();
-            } else {
-                console.log('An error occurred:', error);
-                document.getElementById('loading-status').style.display = 'none';
+            if (allResults.length > 0) {
+                document.getElementById('total-results').textContent = `Total species detected: ${allResults.length}`;
+                populateTable(allResults, startDate, endDate, qualityFilter);
+                await fetchAdditionalData(allResults.map(item => item.taxon.id));
+            }
+
+            document.getElementById('loading-status').style.display = 'none';
+        }
+
+        async function fetchAdditionalData(taxonIds) {
+            const batchSize = 50;
+            const batches = [];
+
+            for (let i = 0; i < taxonIds.length; i += batchSize) {
+                const batch = taxonIds.slice(i, i + batchSize).join(',');
+                batches.push(batch);
+            }
+
+            for (const batch of batches) {
+                const url = `https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_id=${batch}&fields=taxon.id,count`;
+                logApiCall(url);
+
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                    const data = await response.json();
+
+                    for (const item of data.results) {
+                        const row = Array.from(document.getElementById('data-table').rows).find(
+                            r => r.cells[1].textContent === item.taxon.id.toString()
+                        );
+
+                        if (row) {
+                            row.cells[4].textContent = item.count || 'N/A';
+                            const observationCount = parseFloat(row.cells[3].textContent) || 0;
+                            const totalCount = parseFloat(item.count) || 0;
+                            row.cells[5].textContent = totalCount > 0 ? ((observationCount / totalCount) * 100).toFixed(2) : '0.00';
+
+                            // Make Total column a hyperlink
+                            const totalCell = row.cells[4];
+                            const totalLink = document.createElement('a');
+                            totalLink.href = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${item.taxon.id}`;
+                            totalLink.target = '_blank';
+                            totalLink.textContent = totalCell.textContent;
+                            totalCell.textContent = ''; // Clear the previous content
+                            totalCell.appendChild(totalLink);
+                        }
+                    }
+
+                    await delay(1000);
+                } catch (error) {
+                    console.error('Error fetching additional data:', error);
+                }
             }
         }
 
-        function addRowToTable(item) {
+        function populateTable(data, startDate, endDate, qualityFilter) {
             const tableBody = document.getElementById('data-table');
-            
-            let row = Array.from(tableBody.getElementsByTagName('tr')).find(row => row.dataset.taxonId === item.taxon.id.toString());
 
-            if (!row) {
-                row = document.createElement('tr');
-                row.dataset.taxonId = item.taxon.id;
+            data.forEach(item => {
+                const row = document.createElement('tr');
 
-                const taxonNameCell = document.createElement('td');
-                taxonNameCell.textContent = item.taxon.name || 'N/A';
-                taxonNameCell.classList.add('italic');
-                row.appendChild(taxonNameCell);
+                const nameCell = document.createElement('td');
+                nameCell.className = 'italic';
+                nameCell.textContent = item.taxon.name || 'N/A';
+                row.appendChild(nameCell);
 
-                const taxonIdCell = document.createElement('td');
-                const taxonIdLink = document.createElement('a');
-                taxonIdLink.href = `https://inaturalist.lu/taxa/${item.taxon.id}`;
-                taxonIdLink.textContent = item.taxon.id;
-                taxonIdLink.target = '_blank';  // Open in new tab
-                taxonIdCell.appendChild(taxonIdLink);
-                row.appendChild(taxonIdCell);
+                const idCell = document.createElement('td');
+                const idLink = document.createElement('a');
+                idLink.href = `https://inaturalist.lu/taxa/${item.taxon.id}`;
+                idLink.target = '_blank';
+                idLink.textContent = item.taxon.id;
+                idCell.appendChild(idLink);
+                row.appendChild(idCell);
 
                 const iconicTaxonCell = document.createElement('td');
                 iconicTaxonCell.textContent = item.taxon.iconic_taxon_name || 'N/A';
                 row.appendChild(iconicTaxonCell);
 
                 const observationCountCell = document.createElement('td');
-                const observationCountLink = document.createElement('a');
-                observationCountLink.href = `https://inaturalist.lu/observations?d1=${formatDateForApi(document.getElementById('start-date').value)}&d2=${formatDateForApi(document.getElementById('end-date').value)}&place_id=120582&${document.getElementById('filter').value}&taxon_id=${item.taxon.id}`;
-                observationCountLink.textContent = item.count || 'N/A';
-                observationCountLink.target = '_blank';  // Open in new tab
-                observationCountCell.appendChild(observationCountLink);
+                const obsCountLink = document.createElement('a');
+                let obsCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${item.taxon.id}&${qualityFilter}`;
+                if (startDate) obsCountUrl += `&d1=${startDate}`;
+                if (endDate) obsCountUrl += `&d2=${endDate}`;
+                obsCountLink.href = obsCountUrl;
+                obsCountLink.target = '_blank';
+                obsCountLink.textContent = item.count || 'N/A';
+                observationCountCell.appendChild(obsCountLink);
                 row.appendChild(observationCountCell);
 
                 const totalCell = document.createElement('td');
-                totalCell.textContent = 'Loading...';  // Placeholder
+                totalCell.textContent = 'Loading...';
                 row.appendChild(totalCell);
 
                 const ratioCell = document.createElement('td');
-                ratioCell.textContent = 'Loading...';  // Placeholder
+                ratioCell.textContent = 'Loading...';
                 row.appendChild(ratioCell);
 
                 tableBody.appendChild(row);
-            }
-        }
-
-        function fetchCountsInBatches(taxonIds, filter) {
-            const batchSize = 50;
-            let batchIndex = 0;
-
-            function fetchBatch() {
-                const batch = taxonIds.slice(batchIndex * batchSize, (batchIndex + 1) * batchSize);
-                if (batch.length === 0) return;
-
-                const url = `https://api.inaturalist.org/v2/observations/species_counts?${filter}&place_id=120582&taxon_id=${batch.join(',')}&fields=taxon.id,count`;
-
-                logApiCall(url);
-
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        data.results.forEach(countItem => {
-                            const taxonId = countItem.taxon.id;
-                            const count = countItem.count;
-
-                            const row = Array.from(document.querySelectorAll('#data-table tr'))
-                                .find(row => row.dataset.taxonId === taxonId.toString());
-
-                            if (row) {
-                                const totalCell = row.querySelector('td:nth-child(5)');
-                                const ratioCell = row.querySelector('td:nth-child(6)');
-                                totalCell.textContent = count || "N/A";
-
-                                const observationCountCell = row.querySelector('td:nth-child(4) a');
-                                const observationCount = observationCountCell ? parseInt(observationCountCell.textContent) : 0;
-                                const ratio = observationCount && count ? ((observationCount / count) * 100).toFixed(2) : "N/A";
-                                ratioCell.textContent = ratio;
-                            }
-                        });
-
-                        batchIndex++;
-                        if (batchIndex * batchSize < taxonIds.length) {
-                            setTimeout(fetchBatch, 1000); // Add delay to avoid rate-limiting
-                        } else {
-                            document.getElementById('loading-status').style.display = 'none';
-                        }
-                    })
-                    .catch(error => console.error('Error fetching counts:', error));
-            }
-
-            fetchBatch();
-        }
-
-        function logApiCall(url) {
-            const logItem = document.createElement('li');
-            logItem.textContent = url;
-            document.getElementById('api-log-list').appendChild(logItem);
-        }
-
-        function sortTable(columnIndex, ascending) {
-            const table = document.getElementById('data-table');
-            const rows = Array.from(table.getElementsByTagName('tr'));
-
-            rows.sort((rowA, rowB) => {
-                const cellA = rowA.children[columnIndex].textContent.trim();
-                const cellB = rowB.children[columnIndex].textContent.trim();
-
-                let comparison = 0;
-
-                if (columnIndex === 4 || columnIndex === 5) {  // Total and Ratio columns (numeric values)
-                    comparison = parseFloat(cellA) - parseFloat(cellB);
-                } else {  // Text columns
-                    comparison = cellA.localeCompare(cellB);
-                }
-
-                return ascending ? comparison : -comparison;
             });
 
-            rows.forEach(row => table.appendChild(row));  // Reorder the rows in the table
+            // Default sort by ratio, descending
+            currentSortColumn = 5;
+            sortAscending = false;
+            sortTable(5);
         }
-
-        // Sorting functionality
-        document.querySelectorAll('.sortable').forEach(header => {
-            let isAscending = false;
-            header.addEventListener('click', () => {
-                const columnIndex = header.getAttribute('data-column') === 'name' ? 0 :
-                                    header.getAttribute('data-column') === 'id' ? 1 :
-                                    header.getAttribute('data-column') === 'iconic' ? 2 :
-                                    header.getAttribute('data-column') === 'count' ? 3 :
-                                    header.getAttribute('data-column') === 'total' ? 4 : 5;
-
-                isAscending = !isAscending;
-                sortTable(columnIndex, isAscending);
-
-                // Toggle sorting indicator
-                header.classList.toggle('sorted-asc', isAscending);
-                header.classList.toggle('sorted-desc', !isAscending);
-            });
-        });
     </script>
 </body>
 </html>
