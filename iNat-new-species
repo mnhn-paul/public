@@ -73,6 +73,11 @@
         <input type="date" id="end-date">
     </label>
 
+    <label>
+        User Name:
+        <input type="text" id="user-name" placeholder="Enter user name">
+    </label>
+
     <fieldset>
         <legend>Iconic Taxa Filter:</legend>
         <label><input type="checkbox" value="Actinopterygii"> Actinopterygii</label>
@@ -88,7 +93,6 @@
         <label><input type="checkbox" value="Reptilia"> Reptilia</label>
         <label><input type="checkbox" value="Plantae"> Plantae</label>
         <label><input type="checkbox" value="Protozoa"> Protozoa</label>
-        <label><input type="checkbox" value="unknown"> Unknown</label>
     </fieldset>
 
     <button id="run-query">Run Query</button>
@@ -168,11 +172,13 @@
             const taxonomicRank = document.getElementById('taxonomic-rank').value;
             const startDate = document.getElementById('start-date').value;
             const endDate = document.getElementById('end-date').value;
+            const userName = document.getElementById('user-name').value;
             const iconicTaxa = Array.from(document.querySelectorAll('fieldset input:checked'))
                 .map(input => input.value)
                 .join(',');
 
             let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&fields=taxon.id,taxon.name,taxon.iconic_taxon_name,taxon.default_photo.square_url,count&${qualityFilter}&hrank=${taxonomicRank}`;
+            if (userName) apiUrl += `&user_login=${userName}`;
             if (startDate) apiUrl += `&d1=${startDate}`;
             if (endDate) apiUrl += `&d2=${endDate}`;
             if (iconicTaxa) apiUrl += `&iconic_taxa=${iconicTaxa}`;
@@ -182,10 +188,10 @@
             document.getElementById('data-table').innerHTML = '';
             apiLogDiv.innerHTML = '';
 
-            await fetchDataWithPagination(apiUrl, startDate, endDate, qualityFilter);
+            await fetchDataWithPagination(apiUrl, startDate, endDate, qualityFilter, userName);
         });
 
-        async function fetchDataWithPagination(apiUrl, startDate, endDate, qualityFilter) {
+        async function fetchDataWithPagination(apiUrl, startDate, endDate, qualityFilter, userName) {
             let allResults = [];
             let currentPage = 1;
 
@@ -210,124 +216,79 @@
             }
 
             if (allResults.length > 0) {
-                document.getElementById('total-results').textContent = `Total species detected: ${allResults.length}`;
-                populateTable(allResults, startDate, endDate, qualityFilter);
-                await fetchAdditionalData(allResults.map(item => item.taxon.id));
+                document.getElementById('total-results').textContent = `Total Results: ${allResults.length}`;
+                populateTable(allResults, startDate, endDate, qualityFilter, userName);
             }
-
             document.getElementById('loading-status').style.display = 'none';
+
+            await fetchTotalObservationCounts(allResults, startDate, endDate, qualityFilter, userName);
         }
 
-        async function fetchAdditionalData(taxonIds) {
+        async function fetchTotalObservationCounts(data, startDate, endDate, qualityFilter, userName) {
+            const taxonIds = data.map(item => item.taxon.id);
+            let allResults = [];
             const batchSize = 50;
-            const batches = [];
 
             for (let i = 0; i < taxonIds.length; i += batchSize) {
-                const batch = taxonIds.slice(i, i + batchSize).join(',');
-                batches.push(batch);
-            }
-
-            for (const batch of batches) {
-                const url = `https://api.inaturalist.org/v2/observations/species_counts?place_id=120582&taxon_ids=${batch}`;
-                logApiCall(url);
+                const batch = taxonIds.slice(i, i + batchSize);
+                let apiUrl = `https://api.inaturalist.org/v2/observations/species_counts?taxon_id=${batch.join(',')}&place_id=120582&fields=taxon.id,taxon.name,count`;
+                logApiCall(apiUrl);
 
                 try {
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                    const response = await fetch(apiUrl);
                     const data = await response.json();
-
-                    updateTableWithAdditionalData(data.results);
+                    allResults = allResults.concat(data.results);
                     await delay(1000);
                 } catch (error) {
-                    console.error('Error fetching additional data:', error);
+                    console.error('Error fetching total counts:', error);
+                    break;
                 }
             }
+
+            const rows = document.querySelectorAll('#data-table tr');
+            rows.forEach(row => {
+                const taxonId = row.cells[1].textContent.trim();
+                const countCell = row.cells[3];
+                const totalCell = row.cells[4];
+                const ratioCell = row.cells[5];
+                const total = allResults.find(item => item.taxon.id === parseInt(taxonId));
+
+                if (total) {
+                    totalCell.textContent = total.count;
+                    countCell.textContent = countCell.textContent.trim();
+                    const ratio = ((parseInt(countCell.textContent) / total.count) * 100).toFixed(2);
+                    ratioCell.textContent = `${ratio}%`;
+
+                    // Update the observation count URL with filters, including the user filter
+                    const observationUrl = `https://inaturalist.lu/observations?taxon_id=${taxonId}&${qualityFilter}&d1=${startDate}&d2=${endDate}&user_login=${userName}`;
+                    countCell.innerHTML = `<a href="${observationUrl}" target="_blank">${countCell.textContent}</a>`;
+                }
+            });
         }
 
-        function updateTableWithAdditionalData(data) {
-    const rows = Array.from(document.getElementById('data-table').rows);
-
-    data.forEach(item => {
-        const row = rows.find(r => r.cells[1].textContent === String(item.taxon.id));
-        if (row) {
-            row.cells[4].textContent = item.count;
-            const inverseRatio = ((row.cells[3].textContent / item.count) * 100).toFixed(2);
-            row.cells[5].textContent = inverseRatio;
-        }
-    });
-}
-
-
-        function populateTable(data, startDate, endDate, qualityFilter) {
+        function populateTable(data, startDate, endDate, qualityFilter, userName) {
             const tableBody = document.getElementById('data-table');
+            tableBody.innerHTML = '';
 
             data.forEach(item => {
                 const row = document.createElement('tr');
+                const taxonName = item.taxon.name;
+                const taxonId = item.taxon.id;
+                const iconicTaxonName = item.taxon.iconic_taxon_name;
+                const count = item.count;
+                const photoUrl = item.taxon.default_photo ? item.taxon.default_photo.square_url : '';
 
-                // Taxon Name
-                const nameCell = document.createElement('td');
-                nameCell.className = 'italic';
-                nameCell.textContent = item.taxon.name || 'N/A';
-                row.appendChild(nameCell);
-
-                // Taxon ID
-                const idCell = document.createElement('td');
-                const idLink = document.createElement('a');
-                idLink.href = `https://inaturalist.lu/taxa/${item.taxon.id}`;
-                idLink.target = '_blank';
-                idLink.textContent = item.taxon.id;
-                idCell.appendChild(idLink);
-                row.appendChild(idCell);
-
-                // Iconic Taxon Name
-                const iconicTaxonCell = document.createElement('td');
-                iconicTaxonCell.textContent = item.taxon.iconic_taxon_name || 'N/A';
-                row.appendChild(iconicTaxonCell);
-
-                // Observation Count
-                const observationCountCell = document.createElement('td');
-                const obsCountLink = document.createElement('a');
-                let obsCountUrl = `https://inaturalist.lu/observations?place_id=120582&taxon_id=${item.taxon.id}&${qualityFilter}`;
-                if (startDate) obsCountUrl += `&d1=${startDate}`;
-                if (endDate) obsCountUrl += `&d2=${endDate}`;
-                obsCountLink.href = obsCountUrl;
-                obsCountLink.target = '_blank';
-                obsCountLink.textContent = item.count || 'N/A';
-                observationCountCell.appendChild(obsCountLink);
-                row.appendChild(observationCountCell);
-
-                // Total Count
-                const totalCell = document.createElement('td');
-                totalCell.textContent = 'Loading...';
-                row.appendChild(totalCell);
-
-                // Ratio
-                const ratioCell = document.createElement('td');
-                ratioCell.textContent = 'Loading...';
-                row.appendChild(ratioCell);
-
-                // Photo
-                const photoCell = document.createElement('td');
-                const squareUrl = item.taxon.default_photo?.square_url || 'N/A';
-                if (squareUrl !== 'N/A') {
-                    const img = document.createElement('img');
-                    img.src = squareUrl;
-                    img.alt = item.taxon.name || 'Photo';
-                    img.style.width = '50px'; // Adjust size as needed
-                    img.style.height = '50px';
-                    photoCell.appendChild(img);
-                } else {
-                    photoCell.textContent = 'N/A';
-                }
-                row.appendChild(photoCell);
-
+                row.innerHTML = `
+                    <td class="italic">${taxonName}</td>
+                    <td><a href="https://www.inaturalist.org/taxa/${taxonId}" target="_blank">${taxonId}</a></td>
+                    <td>${iconicTaxonName}</td>
+                    <td><a href="https://inaturalist.lu/observations?taxon_id=${taxonId}&${qualityFilter}&d1=${startDate}&d2=${endDate}&user_login=${userName}" target="_blank">${count}</a></td>
+                    <td class="total"></td>
+                    <td class="ratio"></td>
+                    <td><img src="${photoUrl}" alt="${taxonName}"></td>
+                `;
                 tableBody.appendChild(row);
             });
-
-            // Default sort by ratio, descending
-            currentSortColumn = 5;
-            sortAscending = false;
-            sortTable(5);
         }
     </script>
 </body>
